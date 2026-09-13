@@ -8,9 +8,8 @@
 
 
 ### Team Members
-- Team Lead: Saf369 - [College Name]
-- Member 2: [Name] - [College]
-- Member 3: [Name] - [College]
+- Team Lead: Safwan Muhammed - Cochin University of Science and Technology
+- Member 2: Adithya Dev B - Cochin University of Science and Technology
 
 ### Project Description
 An interactive, hyper-realistic seashore experience where you hand-draw text directly onto the coastal sand. A 2D silhouette boy sits faithfully on a rock on the shore counting each incoming wave, while Google Gemini Vision AI inspects your strokes in real time—the moment you dare write *"Kadalamma Kalli"* (Mother Sea, the thief), she takes offence and summons an unstoppable ocean wave that washes your writing completely away!
@@ -105,9 +104,8 @@ graph TD
 ---
 
 ## Team Contributions
-- **Saf369**: Core architecture, Next.js application, Canvas sand rendering engine, Gemini Vision API integration, video wave synchronization, and wave counting companion.
-- **Member 2**: UI/UX design, aesthetic enhancements, and testing.
-- **Member 3**: Concept brainstorming, sound integration, and demo presentation.
+- **Safwan Muhammed**: Core architecture, Next.js application, Canvas sand rendering engine, Gemini Vision API integration, video wave synchronization, and wave counting companion.
+- **Adithya Dev B**: UI/UX design, interactive aesthetic enhancements, audio curation, and testing.
 
 ---
 Made with ❤️ at TinkerHub Useless Projects 
