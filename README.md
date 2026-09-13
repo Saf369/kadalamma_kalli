@@ -2,6 +2,8 @@
 
 > *"Write in the sand. Let the sea respond."*
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-kadalammakalli.vercel.app-blue?style=for-the-badge&logo=vercel&logoColor=white)](https://kadalammakalli.vercel.app/)
+
 An immersive, AI-powered interactive beach experience built with Next.js. Users write the phrase **"kadalamma kalli"** on a virtual sandy seashore, and Google Gemini's vision AI recognizes the handwriting — triggering real ocean wave animations as a living, breathing response.
 
 ---
