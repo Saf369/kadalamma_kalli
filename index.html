@@ -304,7 +304,7 @@
   <!-- Trigger Input & Controls -->
   <div class="trigger-bar" id="triggerBar">
     <input type="text" id="phraseInput" class="trigger-input" placeholder="Type 'kadalamma kalli'"
-      value="kadalamma kalli" />
+      value="" />
     <button class="btn" id="surgeBtn">Surge Wave</button>
     <button class="btn btn-sand" id="autoCarveBtn">Carve Preset</button>
     <button class="btn btn-secondary" id="clearBtn">Clear</button>
@@ -426,10 +426,6 @@
       }
       step();
     }
-
-    setTimeout(() => {
-      autoCarveText(TARGET_PHRASE);
-    }, 500);
 
     // Destructive wash-away synchronized with video time
     function eraseCanvasWithWaveFront(progress) {

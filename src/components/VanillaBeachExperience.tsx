@@ -305,10 +305,6 @@ export default function VanillaBeachExperience() {
       drawCtx.restore();
     }
 
-    const initialCarveTimer = setTimeout(() => {
-      autoCarveText(TARGET_PHRASE);
-    }, 500);
-
     // ── Video wave sync & erasure ─────────────────────────────────────────────
     function eraseCanvasWithWaveFront(progress: number) {
       if (!drawCtx || !drawCanvas) return;
@@ -450,7 +446,6 @@ export default function VanillaBeachExperience() {
     liveInput?.addEventListener('input', onLiveInput);
 
     return () => {
-      clearTimeout(initialCarveTimer);
       if (drawingDebounceRef.current) clearTimeout(drawingDebounceRef.current);
       video.removeEventListener('timeupdate', onTimeUpdate);
       soundBtn.removeEventListener('click', onSoundToggle);
@@ -624,7 +619,7 @@ export default function VanillaBeachExperience() {
           ref={phraseInputRef}
           type="text"
           id="phraseInput"
-          defaultValue="kadalamma kalli"
+          defaultValue=""
           placeholder="Type 'kadalamma kalli'"
           className="bg-transparent border-none outline-none text-xs sm:text-sm text-cyan-200 w-36 sm:w-52 placeholder:text-neutral-500 font-medium"
         />

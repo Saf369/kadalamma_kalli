@@ -16,8 +16,9 @@ export async function POST(request: Request) {
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
     console.log(`Received image base64 length: ${base64Data.length}`);
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+    const requestedModel = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+
+    const generatePayload = {
       contents: [
         {
           role: 'user',
@@ -74,7 +75,27 @@ confidence must be a number between 0 and 1.`,
           required: ['recognizedText', 'isKadalammaKalli', 'confidence'],
         },
       },
-    });
+    };
+
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model: requestedModel,
+        ...generatePayload,
+      });
+    } catch (primaryError: any) {
+      console.warn(`[Gemini API] Failed with ${requestedModel}: ${primaryError?.message || primaryError}`);
+      const fallbackModel = 'gemini-3.1-flash-lite-preview';
+      if (requestedModel !== fallbackModel) {
+        console.log(`[Gemini API] Attempting fallback to ${fallbackModel}...`);
+        response = await ai.models.generateContent({
+          model: fallbackModel,
+          ...generatePayload,
+        });
+      } else {
+        throw primaryError;
+      }
+    }
 
     const jsonText = response.text;
     if (!jsonText) {
