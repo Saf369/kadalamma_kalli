@@ -24,3 +24,76 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ─── Vigorous Sea Animations ─────────────────────────────────────────── */
+
+/* Container tremor during build-up */
+@keyframes vigorousSeaTremor {
+  0%   { transform: translate(0, 0) rotate(0deg); }
+  10%  { transform: translate(-1px, -1px) rotate(-0.1deg); }
+  20%  { transform: translate(2px, 1px) rotate(0.1deg); }
+  30%  { transform: translate(-2px, 0px) rotate(0deg); }
+  40%  { transform: translate(1px, -1px) rotate(0.1deg); }
+  50%  { transform: translate(-1px, 2px) rotate(-0.1deg); }
+  60%  { transform: translate(-2px, 1px) rotate(0deg); }
+  70%  { transform: translate(2px, 1px) rotate(-0.1deg); }
+  80%  { transform: translate(-1px, -1px) rotate(0.1deg); }
+  90%  { transform: translate(2px, 2px) rotate(0deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+/* Video brightness/saturation pulse */
+@keyframes vigorousSeaVideoPulse {
+  0%   { filter: brightness(1.0) saturate(1.0); }
+  15%  { filter: brightness(1.25) saturate(1.6) hue-rotate(-5deg); }
+  35%  { filter: brightness(0.85) saturate(1.8) hue-rotate(3deg); }
+  55%  { filter: brightness(1.3) saturate(2.0) hue-rotate(-3deg); }
+  75%  { filter: brightness(0.9) saturate(1.7); }
+  100% { filter: brightness(1.15) saturate(1.5); }
+}
+
+/* Applied to the outer container during build-up tremor */
+.vigorous-sea {
+  animation: vigorousSeaTremor 0.18s ease-in-out infinite;
+}
+
+/* Applied to the <video> element during the vigorous phase */
+.vigorous-sea-video {
+  animation: vigorousSeaVideoPulse 0.9s ease-in-out infinite;
+  transition: filter 0.4s ease;
+}
+
+/* Trigger bar shake (existing + reused for failed type-check) */
+@keyframes shake {
+  0%   { transform: translateX(0); }
+  18%  { transform: translateX(-6px); }
+  36%  { transform: translateX(5px); }
+  54%  { transform: translateX(-4px); }
+  72%  { transform: translateX(3px); }
+  90%  { transform: translateX(-2px); }
+  100% { transform: translateX(0); }
+}
+
+.shake {
+  animation: shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* Fade-in for status toasts */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-6px) translateX(-50%); }
+  to   { opacity: 1; transform: translateY(0)    translateX(-50%); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+/* AI recognition status badge pulse */
+@keyframes recognizerPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.6); }
+  50%       { box-shadow: 0 0 0 6px rgba(167, 139, 250, 0); }
+}
+
+.recognizer-pulse {
+  animation: recognizerPulse 1.4s ease-in-out infinite;
+}

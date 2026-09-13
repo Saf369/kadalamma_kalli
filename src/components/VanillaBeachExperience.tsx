@@ -1,12 +1,23 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { KadalammaKalliDetector } from './recognition/KadalammaKalliDetector';
+import { VigorousSeaController } from './recognition/VigorousSeaController';
+import type { DetectionResult } from './recognition/KadalammaKalliDetector';
+
+const DebugPanel = React.lazy(() => import('./recognition/DebugPanel'));
 
 const TARGET_PHRASE = 'kadalamma kalli';
-const VIDEO_SRC = '/i_need_the_seashore_be_exactly.mp4';
+const VIDEO_SRC = '/Firefly Cinematic ultra-wide landscape view of a scenic seashore. Extreme wide shot showing the vast.mp4';
 
 // Sand region boundary in percentage of video height (sand is below 45% from top)
 const SAND_TOP_RATIO = 0.45;
+
+// Debounce delay after the user stops drawing before triggering recognition (ms)
+const RECOGNITION_DEBOUNCE_MS = 300;
+
+// Minimum number of strokes before we attempt recognition (avoids empty-canvas calls)
+const MIN_STROKES_FOR_RECOGNITION = 30;
 
 export default function VanillaBeachExperience() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -16,11 +27,33 @@ export default function VanillaBeachExperience() {
   const phraseInputRef = useRef<HTMLInputElement>(null);
   const soundBtnRef = useRef<HTMLButtonElement>(null);
 
+  // AI pipeline refs (persist across renders without causing re-renders)
+  const detectorRef = useRef<KadalammaKalliDetector | null>(null);
+  const vigorousControllerRef = useRef<VigorousSeaController | null>(null);
+  const strokeCountRef = useRef(0);
+  const drawingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const drawCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hudVisible, setHudVisible] = useState(true);
   const [isAudioMuted, setIsAudioMuted] = useState(true);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [debugVisible, setDebugVisible] = useState(false);
 
+  // AI recognition status for the HUD badge
+  const [aiStatus, setAiStatus] = useState<
+    'idle' | 'recognizing' | 'matched' | 'no-match'
+  >('idle');
+
+  // Keep detector instance in state for DebugPanel subscription
+  const [detectorInstance, setDetectorInstance] = useState<KadalammaKalliDetector | null>(null);
+
+  const showStatus = useCallback((msg: string, durationMs = 3500) => {
+    setStatusMessage(msg);
+    setTimeout(() => setStatusMessage(null), durationMs);
+  }, []);
+
+  // ── Main drawing + recognition useEffect ──────────────────────────────────
   useEffect(() => {
     const container = containerRef.current;
     const video = videoRef.current;
@@ -33,294 +66,409 @@ export default function VanillaBeachExperience() {
 
     const drawCtx = drawCanvas.getContext('2d', { willReadFrequently: true });
     if (!drawCtx) return;
+    drawCtxRef.current = drawCtx;
 
-    // --- OFFSCREEN DRAWING CANVAS (1600x900) ---
     drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
 
-    let isDrawing = false;
-    let lastX = 0;
-    let lastY = 0;
+    let activeCarveAnim: number | null = null;
 
-    // Draw realistic carved trench in the video sand
-    function drawCarvedLine(x1: number, y1: number, x2: number, y2: number, radius = 9) {
+    // ── Initialize AI pipeline ──────────────────────────────────────────────
+    const detector = new KadalammaKalliDetector({
+      minPixelCount: 80,
+      debounceMs: 400,
+    });
+    detectorRef.current = detector;
+    setDetectorInstance(detector);
+
+    // Listen for recognition status events to update HUD badge
+    detector.addEventListener('recognitionStarted', () => {
+      setAiStatus('recognizing');
+    });
+    detector.addEventListener('detectionComplete', (e: Event) => {
+      const result = (e as CustomEvent<DetectionResult>).detail;
+      if (result.skippedEmpty) {
+        setAiStatus('idle');
+      } else if (result.matched) {
+        setAiStatus('matched');
+      } else {
+        setAiStatus('no-match');
+        setTimeout(() => setAiStatus('idle'), 3000);
+      }
+    });
+    detector.addEventListener('recognitionError', () => {
+      setAiStatus('idle');
+    });
+
+    // ── Vigorous sea controller ─────────────────────────────────────────────
+    const vigorousController = new VigorousSeaController({
+      videoEl: video,
+      containerEl: container,
+      drawCanvas: drawCanvas,
+      drawCtx: drawCtx,
+      onTriggerSurge: () => {
+        triggerSurge();
+      },
+      onComplete: () => {
+        showStatus('🏖️ Kadalamma Kalli answered! The sea is calm again.', 4000);
+        setAiStatus('idle');
+        detector.resetCache();
+      },
+    });
+    vigorousControllerRef.current = vigorousController;
+
+    // Wire detector → vigorous sea
+    detector.addEventListener('targetDetected', () => {
+      showStatus(
+        '🌊 Kadalamma Kalli recognised! The sea awakens…',
+        6000,
+      );
+      vigorousController.trigger();
+    });
+
+    // ── Sand drawing utilities ──────────────────────────────────────────────
+    function drawCarvedLine(x1: number, y1: number, x2: number, y2: number, radius = 3) {
       if (!drawCtx) return;
       const dist = Math.hypot(x2 - x1, y2 - y1);
       const steps = Math.max(1, Math.ceil(dist / 2.5));
+      const scale = radius / 9;
 
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
         const cx = x1 + (x2 - x1) * t;
         const cy = y1 + (y2 - y1) * t;
 
-        // 1. Sunlit displaced sand rim highlight (upper left)
+        // Sunlit displaced sand rim highlight
         drawCtx.beginPath();
-        drawCtx.arc(cx - 3, cy - 3, radius * 1.3, 0, Math.PI * 2);
+        drawCtx.arc(cx - 3 * scale, cy - 3 * scale, radius * 1.3, 0, Math.PI * 2);
         drawCtx.fillStyle = 'rgba(248, 232, 204, 0.28)';
         drawCtx.fill();
 
-        // 2. Dark trench shadow (moist gouge shadow - lower right)
+        // Dark trench shadow
         drawCtx.beginPath();
-        drawCtx.arc(cx + 2.5, cy + 2.5, radius * 1.05, 0, Math.PI * 2);
+        drawCtx.arc(cx + 2.5 * scale, cy + 2.5 * scale, radius * 1.05, 0, Math.PI * 2);
         drawCtx.fillStyle = 'rgba(38, 20, 8, 0.85)';
         drawCtx.fill();
 
-        // 3. Deep inner gouge core
+        // Deep inner gouge core
         drawCtx.beginPath();
-        drawCtx.arc(cx + 1, cy + 1, radius * 0.5, 0, Math.PI * 2);
+        drawCtx.arc(cx + 1 * scale, cy + 1 * scale, radius * 0.5, 0, Math.PI * 2);
         drawCtx.fillStyle = 'rgba(20, 9, 3, 0.96)';
         drawCtx.fill();
 
-        // 4. Sand grain speckles
+        // Sand grain speckles
         if (Math.random() < 0.15) {
           const ang = Math.random() * Math.PI * 2;
           const sDist = radius * (1.1 + Math.random() * 0.4);
           drawCtx.beginPath();
-          drawCtx.arc(cx + Math.cos(ang) * sDist, cy + Math.sin(ang) * sDist, 1.2, 0, Math.PI * 2);
+          drawCtx.arc(cx + Math.cos(ang) * sDist, cy + Math.sin(ang) * sDist, 1.2 * scale, 0, Math.PI * 2);
           drawCtx.fillStyle = Math.random() > 0.5 ? 'rgba(240, 220, 185, 0.65)' : 'rgba(30, 15, 5, 0.7)';
           drawCtx.fill();
         }
       }
     }
 
-    function getCanvasCoords(e: MouseEvent | TouchEvent) {
-      if (!container || !drawCanvas) return { x: 0, y: 0, normY: 0 };
-      const rect = container.getBoundingClientRect();
-      const clientX = 'touches' in e && e.touches.length > 0 ? e.touches[0].clientX : (e as MouseEvent).clientX;
-      const clientY = 'touches' in e && e.touches.length > 0 ? e.touches[0].clientY : (e as MouseEvent).clientY;
-      const nx = (clientX - rect.left) / rect.width;
-      const ny = (clientY - rect.top) / rect.height;
-      return {
-        x: nx * drawCanvas.width,
-        y: ny * drawCanvas.height,
-        normY: ny, // 0 at top, 1 at bottom
-      };
+    // ── AI recognition trigger (called when user stops drawing) ─────────────
+    function scheduleRecognition() {
+      if (drawingDebounceRef.current) {
+        clearTimeout(drawingDebounceRef.current);
+      }
+      drawingDebounceRef.current = setTimeout(async () => {
+        if (!drawCanvas || !detectorRef.current) return;
+        if (strokeCountRef.current < MIN_STROKES_FOR_RECOGNITION) return;
+        if (vigorousControllerRef.current?.currentState !== 'idle') return;
+
+        await detectorRef.current.detectTargetHandwriting(drawCanvas);
+      }, RECOGNITION_DEBOUNCE_MS);
     }
 
-    const onPointerDown = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('#triggerBar') || target.closest('#topHud')) return;
-      const pt = getCanvasCoords(e);
-      if (pt.normY < SAND_TOP_RATIO) return; // Restrict drawing to sand region only
+    // ── Mouse / Touch drawing events ──────────────────────────────────────────
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    const getPointerPos = (e: PointerEvent) => {
+      if (!drawCanvas) return { x: 0, y: 0 };
+      const scaleX = drawCanvas.width / drawCanvas.clientWidth;
+      const scaleY = drawCanvas.height / drawCanvas.clientHeight;
+      return {
+        x: e.offsetX * scaleX,
+        y: e.offsetY * scaleY,
+      };
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (vigorousControllerRef.current?.currentState !== 'idle') return;
       isDrawing = true;
-      lastX = pt.x;
-      lastY = pt.y;
-      drawCarvedLine(pt.x, pt.y, pt.x, pt.y);
+      const pos = getPointerPos(e);
+      lastX = pos.x;
+      lastY = pos.y;
+      drawCarvedLine(lastX, lastY, lastX + 0.1, lastY + 0.1, 3);
     };
 
-    const onPointerMove = (e: MouseEvent) => {
+    const onPointerMove = (e: PointerEvent) => {
       if (!isDrawing) return;
-      const pt = getCanvasCoords(e);
-      if (pt.normY < SAND_TOP_RATIO) {
-        isDrawing = false;
-        return;
-      }
-      drawCarvedLine(lastX, lastY, pt.x, pt.y);
-      lastX = pt.x;
-      lastY = pt.y;
+      const pos = getPointerPos(e);
+      drawCarvedLine(lastX, lastY, pos.x, pos.y, 3);
+      lastX = pos.x;
+      lastY = pos.y;
+      strokeCountRef.current++;
     };
 
-    const onPointerUp = () => { isDrawing = false; };
+    const onPointerUp = () => {
+      if (!isDrawing) return;
+      isDrawing = false;
+      scheduleRecognition();
+    };
 
-    container.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
+    drawCanvas.addEventListener('pointerdown', onPointerDown);
+    drawCanvas.addEventListener('pointermove', onPointerMove);
+    drawCanvas.addEventListener('pointerup', onPointerUp);
+    drawCanvas.addEventListener('pointerout', onPointerUp);
+    drawCanvas.addEventListener('pointercancel', onPointerUp);
 
-    // Auto-carve cursive preset for "kadalamma kalli"
-    function autoCarveText(text = TARGET_PHRASE) {
-      if (!drawCanvas) return;
-      const temp = document.createElement('canvas');
-      temp.width = drawCanvas.width;
-      temp.height = drawCanvas.height;
-      const tctx = temp.getContext('2d');
-      if (!tctx) return;
 
-      tctx.fillStyle = '#fff';
-      tctx.font = 'bold 96px "Brush Script MT", "Segoe Script", "Dancing Script", cursive, sans-serif';
-      tctx.textAlign = 'center';
-      tctx.textBaseline = 'middle';
 
-      const cx = temp.width * 0.5;
-      const cy = temp.height * 0.74; // Lower sand area
-      tctx.fillText(text, cx, cy);
-
-      const pData = tctx.getImageData(0, 0, temp.width, temp.height).data;
-      const points: { x: number; y: number }[] = [];
-      for (let y = cy - 80; y < cy + 80; y += 4) {
-        for (let x = cx - 540; x < cx + 540; x += 4) {
-          if (pData[(y * temp.width + x) * 4 + 3] > 100) {
-            points.push({ x: x + (Math.random() - 0.5) * 2, y: y + (Math.random() - 0.5) * 2 });
-          }
-        }
+    // ── Auto-carve preset ────────────────────────────────────────────────────
+    function autoCarveText(text = TARGET_PHRASE, triggerAI = false, instant = false) {
+      if (activeCarveAnim) {
+        cancelAnimationFrame(activeCarveAnim);
+        activeCarveAnim = null;
       }
+      if (!drawCanvas || !drawCtx) return;
 
-      points.sort((a, b) => {
-        const dx = a.x - b.x;
-        return Math.abs(dx) > 28 ? dx : a.y - b.y;
-      });
+      const cx = drawCanvas.width * 0.5;
+      const cy = drawCanvas.height * 0.74;
+      const fontString = '40px "Caveat", "Dancing Script", "Segoe Script", cursive, sans-serif';
 
-      let idx = 0;
-      let prev: { x: number; y: number } | null = null;
-      let animId: number;
+      drawCtx.save();
+      drawCtx.font = fontString;
+      const textMetrics = drawCtx.measureText(text);
+      drawCtx.restore();
 
-      function step() {
-        const batch = Math.min(points.length, idx + 22);
-        for (let i = idx; i < batch; i++) {
-          const pt = points[i];
-          if (prev && Math.hypot(pt.x - prev.x, pt.y - prev.y) < 48) {
-            drawCarvedLine(prev.x, prev.y, pt.x, pt.y, 8);
+      const textWidth = textMetrics.width;
+      const textHeight = 60; // rough bounding box
+
+      if (instant) {
+        drawSmoothText(text, cx, cy, fontString);
+        strokeCountRef.current = 50; // satisfy AI threshold
+        if (triggerAI) scheduleRecognition();
+      } else {
+        let progress = 0;
+        function step() {
+          if (!drawCtx) return;
+          progress += 0.05;
+          if (progress > 1) progress = 1;
+
+          drawCtx.save();
+          drawCtx.beginPath();
+          drawCtx.rect(cx - textWidth / 2 - 10, cy - textHeight / 2, (textWidth + 20) * progress, textHeight);
+          drawCtx.clip();
+
+          drawSmoothText(text, cx, cy, fontString);
+
+          drawCtx.restore();
+
+          if (progress < 1) {
+            activeCarveAnim = requestAnimationFrame(step);
           } else {
-            drawCarvedLine(pt.x, pt.y, pt.x, pt.y, 8);
+            activeCarveAnim = null;
+            strokeCountRef.current = 50; // satisfy AI threshold
+            if (triggerAI) scheduleRecognition();
           }
-          prev = pt;
         }
-        idx = batch;
-        if (idx < points.length) {
-          animId = requestAnimationFrame(step);
-        }
+        step();
       }
-      step();
+    }
+
+    function drawSmoothText(text: string, cx: number, cy: number, fontStr: string) {
+      if (!drawCtx) return;
+      drawCtx.save();
+      drawCtx.font = fontStr;
+      drawCtx.textAlign = 'center';
+      drawCtx.textBaseline = 'middle';
+
+      // 1. Sunlit rim
+      drawCtx.fillStyle = 'rgba(248, 232, 204, 0.4)';
+      drawCtx.fillText(text, cx - 1.5, cy - 1.5);
+
+      // 2. Dark shadow
+      drawCtx.fillStyle = 'rgba(38, 20, 8, 0.9)';
+      drawCtx.fillText(text, cx + 1.5, cy + 1.5);
+
+      // 3. Deep core
+      drawCtx.fillStyle = 'rgba(20, 9, 3, 0.95)';
+      drawCtx.fillText(text, cx + 0.5, cy + 0.5);
+
+      drawCtx.restore();
     }
 
     const initialCarveTimer = setTimeout(() => {
       autoCarveText(TARGET_PHRASE);
     }, 500);
 
-    // --- DESTRUCTIVE CANVAS ERASE SYNCHRONIZED WITH VIDEO WAVE ---
-    // Video surge timeline: wave rolls down beach from 0.8s to 3.5s of video
+    // ── Video wave sync & erasure ─────────────────────────────────────────────
     function eraseCanvasWithWaveFront(progress: number) {
       if (!drawCtx || !drawCanvas) return;
       if (progress <= 0.01) return;
 
-      // Start of sand in canvas Y = 0.45 * height; max wash Y = 0.92 * height
       const startY = 0.45 * drawCanvas.height;
       const targetY = 0.92 * drawCanvas.height;
       const currentWashY = startY + (targetY - startY) * Math.min(1.0, progress);
 
       drawCtx.save();
-      drawCtx.globalCompositeOperation = 'destination-out';
+      
+      // Create a clipping mask matching the wave's shape (center wedge)
+      drawCtx.beginPath();
+      drawCtx.moveTo(drawCanvas.width * 0.25, startY);
+      drawCtx.lineTo(drawCanvas.width * 0.75, startY);
+      drawCtx.lineTo(drawCanvas.width * 0.95, drawCanvas.height);
+      drawCtx.lineTo(drawCanvas.width * 0.05, drawCanvas.height);
+      drawCtx.closePath();
+      drawCtx.clip();
 
-      // Solid clear above wave front
+      drawCtx.globalCompositeOperation = 'destination-out';
       drawCtx.fillStyle = 'rgba(0, 0, 0, 1.0)';
       drawCtx.fillRect(0, 0, drawCanvas.width, Math.max(0, currentWashY - 40));
 
-      // Feathered linear gradient along surging foam front
       const grad = drawCtx.createLinearGradient(0, Math.max(0, currentWashY - 40), 0, currentWashY + 40);
       grad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
       grad.addColorStop(0.65, 'rgba(0, 0, 0, 0.85)');
       grad.addColorStop(0.9, 'rgba(0, 0, 0, 0.35)');
       grad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
-
       drawCtx.fillStyle = grad;
       drawCtx.fillRect(0, Math.max(0, currentWashY - 40), drawCanvas.width, 80);
-
       drawCtx.restore();
     }
 
-    // Monitor video time update to synchronize the wash-away
     const onTimeUpdate = () => {
       if (!video) return;
-      const curTime = video.currentTime;
+      // ONLY erase the canvas if the VigorousSeaController has actively triggered the surge!
+      if (vigorousControllerRef.current?.currentState !== 'vigorous') return;
 
-      // Wave surge happens between 0.8s and 3.4s in i_need_the_seashore_be_exactly.mp4
+      const curTime = video.currentTime;
       if (curTime >= 0.8 && curTime <= 3.4) {
-        const surgeProgress = (curTime - 0.8) / 2.4; // 0 -> 1
+        const surgeProgress = (curTime - 0.8) / 2.4;
         eraseCanvasWithWaveFront(surgeProgress);
       } else if (curTime > 3.4 && curTime <= 4.0) {
-        // Complete sweep at peak wash
         eraseCanvasWithWaveFront(1.0);
+        strokeCountRef.current = 0;
+        detector.resetCache();
       }
     };
-
     video.addEventListener('timeupdate', onTimeUpdate);
 
-    // Audio Toggle
+    // ── Audio toggle ─────────────────────────────────────────────────────────
     const onSoundToggle = () => {
       if (!video) return;
       const nextMuted = !video.muted;
       video.muted = nextMuted;
       setIsAudioMuted(nextMuted);
-      soundBtn.textContent = nextMuted ? '🔇' : '🔊';
     };
     soundBtn.addEventListener('click', onSoundToggle);
 
-    // Trigger Surge Button / Form Submit
+    // ── Surge trigger (shared between manual and AI) ──────────────────────────
     function triggerSurge() {
       if (!video) return;
-      setStatusMessage("🌊 Wave surge rushing over the shore!");
-      // Seek video to the start of the surge wave (0.8s) and play
       video.currentTime = 0.8;
-      video.play().catch(() => {});
-
-      setTimeout(() => {
-        setStatusMessage("🏖️ Wave receded: text washed away into pristine smooth wet sand.");
-        setTimeout(() => setStatusMessage(null), 3000);
-      }, 4000);
+      video.play().catch(() => { });
     }
 
+    // ── Manual trigger bar controls ──────────────────────────────────────────
     function checkAndTrigger() {
-      const val = phraseInput?.value.trim().toLowerCase();
-      if (val === TARGET_PHRASE) {
-        triggerSurge();
-      } else {
-        triggerBar?.classList.remove('shake');
-        void triggerBar?.offsetWidth;
-        triggerBar?.classList.add('shake');
-        setStatusMessage(`Type '${TARGET_PHRASE}' to trigger wave surge`);
-        setTimeout(() => setStatusMessage(null), 2500);
-      }
+      const val = phraseInput?.value.trim();
+      if (!val) return;
+
+      strokeCountRef.current = 0;
+      detector.resetCache();
+      if (drawCtx && drawCanvas) drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      if (drawingDebounceRef.current) clearTimeout(drawingDebounceRef.current);
+      
+      autoCarveText(val, true, true);
+      showStatus("✍️ Carving into the sand… AI will analyze it!", 3000);
     }
 
     const surgeBtn = document.getElementById('surgeBtn');
     const autoCarveBtn = document.getElementById('autoCarveBtn');
     const clearBtn = document.getElementById('clearBtn');
+    const liveInput = document.getElementById('liveSandInput');
 
     const onSurgeClick = () => checkAndTrigger();
     const onKeydown = (e: KeyboardEvent) => { if (e.key === 'Enter') checkAndTrigger(); };
     const onAutoCarve = () => {
-      autoCarveText(TARGET_PHRASE);
-      setStatusMessage("✍️ Carving 'kadalamma kalli' into the sand...");
-      setTimeout(() => setStatusMessage(null), 2000);
+      strokeCountRef.current = 0;
+      detector.resetCache();
+      drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      autoCarveText(TARGET_PHRASE, true); // true = trigger AI after carving
+      showStatus("✍️ Carving 'kadalamma kalli' into the sand… AI will recognize it!", 3000);
+    };
+    const onLiveInput = (e: Event) => {
+      const text = (e.target as HTMLInputElement).value;
+      strokeCountRef.current = 0;
+      detector.resetCache();
+      if (drawCtx && drawCanvas) drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      if (drawingDebounceRef.current) clearTimeout(drawingDebounceRef.current);
+      if (text.trim().length > 0) {
+        autoCarveText(text, true, true); // instant = true
+      }
     };
     const onClear = () => {
       if (!drawCtx || !drawCanvas) return;
       drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      strokeCountRef.current = 0;
+      detector.resetCache();
+      setAiStatus('idle');
+      if (drawingDebounceRef.current) clearTimeout(drawingDebounceRef.current);
     };
 
     surgeBtn?.addEventListener('click', onSurgeClick);
     phraseInput.addEventListener('keydown', onKeydown);
     autoCarveBtn?.addEventListener('click', onAutoCarve);
     clearBtn?.addEventListener('click', onClear);
+    liveInput?.addEventListener('input', onLiveInput);
 
     return () => {
       clearTimeout(initialCarveTimer);
-      container.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
+      if (drawingDebounceRef.current) clearTimeout(drawingDebounceRef.current);
       video.removeEventListener('timeupdate', onTimeUpdate);
       soundBtn.removeEventListener('click', onSoundToggle);
       surgeBtn?.removeEventListener('click', onSurgeClick);
       phraseInput.removeEventListener('keydown', onKeydown);
       autoCarveBtn?.removeEventListener('click', onAutoCarve);
       clearBtn?.removeEventListener('click', onClear);
+      liveInput?.removeEventListener('input', onLiveInput);
+      detector.dispose();
+      vigorousController.dispose();
+      detectorRef.current = null;
+      vigorousControllerRef.current = null;
     };
-  }, []);
+  }, [showStatus]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
+      document.documentElement.requestFullscreen().catch(() => { });
       setIsFullscreen(true);
     } else {
-      document.exitFullscreen().catch(() => {});
+      document.exitFullscreen().catch(() => { });
       setIsFullscreen(false);
     }
   };
+
+  const toggleDebug = useCallback(() => setDebugVisible((v) => !v), []);
+
+  // ── AI status badge label ─────────────────────────────────────────────────
+  const aiBadge = {
+    idle: null,
+    recognizing: { label: '🔍 Recognizing…', cls: 'bg-amber-500/20 border-amber-400/40 text-amber-200 recognizer-pulse' },
+    matched: { label: '✅ Kadalamma Kalli!', cls: 'bg-green-500/20 border-green-400/40 text-green-200' },
+    'no-match': { label: '❌ Not matched', cls: 'bg-neutral-800/60 border-neutral-700/40 text-neutral-400' },
+  }[aiStatus];
 
   return (
     <div
       ref={containerRef}
       className="fixed inset-0 w-screen h-screen overflow-hidden bg-black select-none cursor-crosshair flex items-center justify-center"
     >
-      {/* Exact High-Definition Seashore Video Background */}
+      {/* Background Video */}
       <video
         ref={videoRef}
         src={VIDEO_SRC}
@@ -331,51 +479,65 @@ export default function VanillaBeachExperience() {
         className="absolute inset-0 w-full h-full object-cover pointer-events-none"
       />
 
-      {/* Interactive Sand Carving Layer overlaid directly on the video sand */}
+      {/* Sand Drawing Canvas */}
       <canvas
         ref={drawCanvasRef}
         width={1600}
         height={900}
         className="absolute inset-0 w-full h-full object-cover pointer-events-auto mix-blend-multiply opacity-95"
+        style={{
+          transformOrigin: 'center 45%',
+          transform: 'perspective(1200px) rotateX(60deg) scale(1.6)',
+        }}
       />
 
-      {/* Status Toast Notification */}
+      {/* Status Toast */}
       {statusMessage && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-neutral-950/80 backdrop-blur-md border border-cyan-400/30 text-cyan-200 text-xs sm:text-sm px-4 py-2 rounded-full shadow-2xl z-40 animate-fade-in pointer-events-none">
           {statusMessage}
         </div>
       )}
 
+      {/* AI Status Badge */}
+      {aiBadge && (
+        <div className={`absolute top-24 left-1/2 -translate-x-1/2 text-[11px] px-3 py-1 rounded-full border font-medium z-40 pointer-events-none transition-all ${aiBadge.cls}`}>
+          {aiBadge.label}
+        </div>
+      )}
+
       {/* Top HUD */}
       <div
         id="topHud"
-        className={`absolute top-4 left-6 right-6 flex justify-between items-center pointer-events-none z-30 transition-opacity duration-300 ${
-          hudVisible ? 'opacity-100' : 'opacity-20 hover:opacity-100'
-        }`}
+        className={`absolute top-4 left-6 right-6 flex justify-between items-center pointer-events-none z-30 transition-opacity duration-300 ${hudVisible ? 'opacity-100' : 'opacity-20 hover:opacity-100'
+          }`}
       >
         <div className="flex items-center gap-2.5 bg-neutral-950/65 backdrop-blur-xl border border-white/15 px-4 py-2 rounded-full shadow-2xl">
           <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_12px_#22d3ee] animate-pulse" />
           <span className="text-xs sm:text-sm font-bold tracking-wide text-white">
             Kadalamma Kalli Shore
           </span>
+          {/* AI indicator dot */}
+          <span
+            title="AI Handwriting Recognition active"
+            className="w-2 h-2 rounded-full bg-purple-400 shadow-[0_0_8px_#a78bfa] animate-pulse ml-1"
+          />
         </div>
 
         <div className="flex items-center gap-2 pointer-events-auto">
-          {/* Sound toggle button */}
+          {/* Sound toggle */}
           <button
             ref={soundBtnRef}
             id="soundBtn"
-            title={isAudioMuted ? 'Unmute Real Ocean Surf Sound' : 'Mute Sound'}
-            className={`w-9 h-9 rounded-full backdrop-blur-xl border flex items-center justify-center text-sm shadow-xl transition-all ${
-              !isAudioMuted
-                ? 'bg-cyan-500/30 border-cyan-400 text-cyan-200 shadow-cyan-500/30'
-                : 'bg-neutral-950/65 border-white/15 text-neutral-300 hover:text-white'
-            }`}
+            title={isAudioMuted ? 'Unmute' : 'Mute Sound'}
+            className={`w-9 h-9 rounded-full backdrop-blur-xl border flex items-center justify-center text-sm shadow-xl transition-all ${!isAudioMuted
+              ? 'bg-cyan-500/30 border-cyan-400 text-cyan-200 shadow-cyan-500/30'
+              : 'bg-neutral-950/65 border-white/15 text-neutral-300 hover:text-white'
+              }`}
           >
             {isAudioMuted ? '🔇' : '🔊'}
           </button>
 
-          {/* Fullscreen toggle button */}
+          {/* Fullscreen toggle */}
           <button
             onClick={toggleFullscreen}
             title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
@@ -384,10 +546,10 @@ export default function VanillaBeachExperience() {
             {isFullscreen ? '✕' : '⛶'}
           </button>
 
-          {/* Toggle HUD visibility */}
+          {/* HUD toggle */}
           <button
             onClick={() => setHudVisible(!hudVisible)}
-            title="Toggle Controls Visibility"
+            title="Toggle Controls"
             className="w-9 h-9 rounded-full bg-neutral-950/65 backdrop-blur-xl border border-white/15 flex items-center justify-center text-xs text-neutral-400 hover:text-white shadow-xl transition-all"
           >
             {hudVisible ? '👁' : '👁‍🗨'}
@@ -395,20 +557,30 @@ export default function VanillaBeachExperience() {
         </div>
       </div>
 
-      {/* Gentle Drawing Hint */}
+      {/* Drawing Hint & Live Input */}
       {hudVisible && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 pointer-events-none text-[11px] sm:text-xs text-amber-100/80 bg-black/50 backdrop-blur-md px-4 py-1 rounded-full border border-white/15 shadow-xl tracking-wide">
-          ✍️ Click &amp; drag across the sand to carve freehand
+        <div className="absolute top-[60%] left-1/2 -translate-x-1/2 flex flex-col items-center gap-4 z-30">
+          <div className="pointer-events-none text-[11px] sm:text-xs text-amber-100/80 bg-black/50 backdrop-blur-md px-4 py-1 rounded-full border border-white/15 shadow-xl tracking-wide text-center">
+            ✍️ Write &ldquo;Kadalamma Kalli&rdquo; on the sand · AI watches after you pause
+          </div>
+          
+          <input
+            id="liveSandInput"
+            type="text"
+            placeholder="...or type here to carve instantly"
+            className="bg-black/20 text-white/90 placeholder-white/60 px-5 py-2.5 rounded-2xl backdrop-blur-md border border-white/20 text-center font-bold text-lg sm:text-xl outline-none focus:bg-black/40 focus:border-white/40 focus:shadow-[0_0_20px_rgba(255,255,255,0.2)] transition-all shadow-lg shadow-black/20"
+            autoComplete="off"
+            spellCheck="false"
+          />
         </div>
       )}
 
-      {/* Floating Bottom Control Pill */}
+      {/* Bottom Control Bar */}
       <div
         ref={triggerBarRef}
         id="triggerBar"
-        className={`absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-3 bg-neutral-950/85 backdrop-blur-2xl border border-white/15 py-2 px-3 sm:px-4 rounded-full shadow-2xl z-30 pointer-events-auto transition-all duration-300 ${
-          hudVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6 pointer-events-none'
-        }`}
+        className={`absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-3 bg-neutral-950/85 backdrop-blur-2xl border border-white/15 py-2 px-3 sm:px-4 rounded-full shadow-2xl z-30 pointer-events-auto transition-all duration-300 ${hudVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6 pointer-events-none'
+          }`}
       >
         <input
           ref={phraseInputRef}
@@ -440,6 +612,15 @@ export default function VanillaBeachExperience() {
           Clear
         </button>
       </div>
+
+      {/* Debug Panel (lazy-loaded, toggled with D key) */}
+      <React.Suspense fallback={null}>
+        <DebugPanel
+          detector={detectorInstance}
+          visible={debugVisible}
+          onToggle={toggleDebug}
+        />
+      </React.Suspense>
     </div>
   );
 }
