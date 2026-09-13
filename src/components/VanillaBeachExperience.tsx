@@ -45,6 +45,8 @@ export default function VanillaBeachExperience() {
     'idle' | 'recognizing' | 'matched' | 'no-match'
   >('idle');
 
+  const [waveCount, setWaveCount] = useState(0);
+
   // Keep detector instance in state for DebugPanel subscription
   const [detectorInstance, setDetectorInstance] = useState<KadalammaKalliDetector | null>(null);
 
@@ -340,12 +342,20 @@ export default function VanillaBeachExperience() {
       drawCtx.restore();
     }
 
+    let lastVideoTime = 0;
     const onTimeUpdate = () => {
       if (!video) return;
+
+      const curTime = video.currentTime;
+      // If the video loops back to the start, count it as a wave
+      if (curTime < lastVideoTime && lastVideoTime - curTime > 1.0) {
+        setWaveCount(c => c + 1);
+      }
+      lastVideoTime = curTime;
+
       // ONLY erase the canvas if the VigorousSeaController has actively triggered the surge!
       if (vigorousControllerRef.current?.currentState !== 'vigorous') return;
 
-      const curTime = video.currentTime;
       if (curTime >= 0.8 && curTime <= 3.4) {
         const surgeProgress = (curTime - 0.8) / 2.4;
         eraseCanvasWithWaveFront(surgeProgress);
@@ -574,6 +584,21 @@ export default function VanillaBeachExperience() {
           />
         </div>
       )}
+
+      {/* Boy Counting Waves */}
+      <div className="absolute bottom-4 left-4 sm:bottom-8 sm:left-8 flex flex-col items-center pointer-events-none z-20 select-none">
+        <div className="relative">
+          <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-white/95 text-slate-800 px-3.5 py-1.5 rounded-2xl shadow-xl font-bold text-xs sm:text-sm whitespace-nowrap flex items-center gap-1.5 backdrop-blur-sm border border-slate-200">
+            <span>Waves: {waveCount} 🌊</span>
+            <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white/95 rotate-45 border-r border-b border-slate-200"></div>
+          </div>
+          <img 
+            src="/boy_ocean_transparent.png" 
+            alt="Boy sitting on rock facing ocean" 
+            className="w-36 h-auto sm:w-48 md:w-56 object-contain drop-shadow-[0_12px_20px_rgba(0,0,0,0.35)]"
+          />
+        </div>
+      </div>
 
       {/* Bottom Control Bar */}
       <div
