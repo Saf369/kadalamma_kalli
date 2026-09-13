@@ -305,6 +305,10 @@ export default function VanillaBeachExperience() {
       drawCtx.restore();
     }
 
+    const initialCarveTimer = setTimeout(() => {
+      autoCarveText(TARGET_PHRASE);
+    }, 500);
+
     // ── Video wave sync & erasure ─────────────────────────────────────────────
     function eraseCanvasWithWaveFront(progress: number) {
       if (!drawCtx || !drawCanvas) return;
@@ -315,7 +319,7 @@ export default function VanillaBeachExperience() {
       const currentWashY = startY + (targetY - startY) * Math.min(1.0, progress);
 
       drawCtx.save();
-      
+
       // Create a clipping mask matching the wave's shape (center wedge)
       drawCtx.beginPath();
       drawCtx.moveTo(drawCanvas.width * 0.25, startY);
@@ -401,7 +405,7 @@ export default function VanillaBeachExperience() {
       detector.resetCache();
       if (drawCtx && drawCanvas) drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
       if (drawingDebounceRef.current) clearTimeout(drawingDebounceRef.current);
-      
+
       autoCarveText(val, true, true);
       showStatus("✍️ Carving into the sand… AI will analyze it!", 3000);
     }
@@ -446,6 +450,7 @@ export default function VanillaBeachExperience() {
     liveInput?.addEventListener('input', onLiveInput);
 
     return () => {
+      clearTimeout(initialCarveTimer);
       if (drawingDebounceRef.current) clearTimeout(drawingDebounceRef.current);
       video.removeEventListener('timeupdate', onTimeUpdate);
       soundBtn.removeEventListener('click', onSoundToggle);
@@ -581,7 +586,7 @@ export default function VanillaBeachExperience() {
           <div className="pointer-events-none text-[11px] sm:text-xs text-amber-100/80 bg-black/50 backdrop-blur-md px-4 py-1 rounded-full border border-white/15 shadow-xl tracking-wide text-center">
             ✍️ Write &ldquo;Kadalamma Kalli&rdquo; on the sand · AI watches after you pause
           </div>
-          
+
           <input
             id="liveSandInput"
             type="text"
@@ -600,9 +605,9 @@ export default function VanillaBeachExperience() {
             <span>Waves: {waveCount} 🌊</span>
             <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white/95 rotate-45 border-r border-b border-slate-200"></div>
           </div>
-          <img 
-            src="/boy_ocean_transparent.png" 
-            alt="Boy sitting on rock facing ocean" 
+          <img
+            src="/boy_ocean_transparent.png"
+            alt="Boy sitting on rock facing ocean"
             className="w-36 h-auto sm:w-48 md:w-56 object-contain drop-shadow-[0_12px_20px_rgba(0,0,0,0.35)]"
           />
         </div>
@@ -619,7 +624,7 @@ export default function VanillaBeachExperience() {
           ref={phraseInputRef}
           type="text"
           id="phraseInput"
-          defaultValue=""
+          defaultValue="kadalamma kalli"
           placeholder="Type 'kadalamma kalli'"
           className="bg-transparent border-none outline-none text-xs sm:text-sm text-cyan-200 w-36 sm:w-52 placeholder:text-neutral-500 font-medium"
         />

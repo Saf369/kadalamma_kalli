@@ -1,147 +1,116 @@
-# 🌊 Kadalamma Kalli
+<img width="1280" height="640" alt="git (1)" src="https://github.com/user-attachments/assets/8920b256-2ba8-4988-b824-5351134eb4bd" />
 
-> *"Write in the sand. Let the sea respond."*
+# Kadalamma Kalli 🌊🎯
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-kadalammakalli.vercel.app-blue?style=for-the-badge&logo=vercel&logoColor=white)](https://kadalammakalli.vercel.app/)
 
-An immersive, AI-powered interactive beach experience built with Next.js. Users write the phrase **"kadalamma kalli"** on a virtual sandy seashore, and Google Gemini's vision AI recognizes the handwriting — triggering real ocean wave animations as a living, breathing response.
+## Basic Details
+### Team Name: [Your Team Name]
 
----
 
-## ✨ Features
+### Team Members
+- Team Lead: Saf369 - [College Name]
+- Member 2: [Name] - [College]
+- Member 3: [Name] - [College]
 
-- 🖐️ **Freehand Sand Drawing** — Draw directly on a video seashore using mouse or touch input, constrained to the sand region of the scene
-- 🤖 **AI Handwriting Recognition** — Powered by Google Gemini's multimodal vision API, detecting the target phrase in real time
-- 🌊 **Dynamic Wave Response** — Recognized text triggers choreographed wave milestones synced to a looping ocean video
-- 🔊 **Ambient Audio Engine** — Toggleable ocean soundscape for full immersion
-- 🎨 **Canvas Preprocessing Pipeline** — Smart image preprocessing before sending to Gemini, minimizing false positives on near-empty canvases
-- 🐛 **Developer Debug Panel** — Lazy-loaded debug overlay showing recognition confidence, matched text, and pipeline state
-- 📱 **Fullscreen Support** — Native fullscreen mode for a truly cinematic experience
+### Project Description
+An interactive, hyper-realistic seashore experience where you hand-draw text directly onto the coastal sand. A 2D silhouette boy sits faithfully on a rock on the shore counting each incoming wave, while Google Gemini Vision AI inspects your strokes in real time—the moment you dare write *"Kadalamma Kalli"* (Mother Sea, the thief), she takes offence and summons an unstoppable ocean wave that washes your writing completely away!
 
----
+### The Problem (that doesn't exist)
+Going to an actual beach just to write names, poetry, or heartbreak messages into the sand is exhausting. Your footwear gets filled with abrasive sand, the sun gives you a harsh tan you never asked for, and waiting hours for real-world high tide to dramatically erase your dramatic words takes way too long.
 
-## 🛠️ Tech Stack
+### The Solution (that nobody asked for)
+A browser-based beach experience complete with realistic canvas sand trench physics, a 2D companion who counts ocean waves as they break, and cutting-edge Google Gemini Multimodal Vision AI. The instant you finish carving *"Kadalamma Kalli"*, Mother Sea herself is insulted and rushes in with a foamy tidal surge to wipe the sand completely clean!
 
-| Layer | Technology |
-|---|---|
-| Framework | [Next.js 16](https://nextjs.org/) with App Router |
-| Language | TypeScript |
-| UI | React 19 |
-| Styling | Tailwind CSS v4 |
-| 3D / WebGL | Three.js · React Three Fiber · Drei |
-| AI Recognition | Google Gemini API (`@google/genai`) |
-| Handwriting OCR | Tesseract.js (fallback preprocessing) |
-| Icons | Lucide React |
-| Animations | Canvas-Confetti |
+## Technical Details
+### Technologies/Components Used
+For Software:
+- **Languages used**: TypeScript, JavaScript, HTML5, CSS3
+- **Frameworks used**: Next.js 16 (Turbopack, App Router), React 19, Tailwind CSS
+- **Libraries used**: `@google/genai` (Google Gen AI SDK), HTML5 Canvas 2D Context API, Web Audio API
+- **Tools used**: Google Gemini 3.5 Flash Lite Vision API, FFmpeg (video & asset optimization), Git, VS Code
 
----
+For Hardware:
+- *Not Applicable (Pure Software Project)*
 
-## 🚀 Getting Started
+### Implementation
+For Software:
 
-### Prerequisites
-
-- Node.js `>= 18`
-- A [Google Gemini API key](https://aistudio.google.com/app/apikey)
-
-### Installation
-
+# Installation
 ```bash
 # Clone the repository
 git clone https://github.com/Saf369/kadalamma_kalli.git
 cd kadalamma_kalli
 
-# Install dependencies
+# Install project dependencies
 npm install
 ```
 
-### Environment Setup
-
-Create a `.env.local` file in the project root:
-
+# Environment Setup
+Create a `.env` file in the root directory:
 ```env
-GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_API_KEY="your_google_gemini_api_key_here"
+GEMINI_MODEL="gemini-3.5-flash-lite"
 ```
 
-### Running Locally
-
+# Run
 ```bash
+# Start the local development server
 npm run dev
 ```
-
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 🧠 How It Works
+### Project Documentation
+For Software:
 
-```
-User draws on canvas
-        │
-        ▼
-HandwritingPreprocessor
-(noise filter · contrast boost · bounding crop)
-        │
-        ▼
-/api/recognize-handwriting  ←──  Gemini Vision API
-        │
-        ▼
-KadalammaKalliDetector
-(confidence threshold · debounce · event emit)
-        │
-        ▼
-VigorousSeaController
-(video seek · wave milestone trigger · animation)
-```
+# Screenshots (Add at least 3)
 
-1. **Canvas Layer** — An HTML5 canvas overlaid on a looping ocean video lets the user draw freely in the sand region (below 45% of viewport height).
-2. **Preprocessing** — `HandwritingPreprocessor` filters noise, boosts contrast, and crops to the bounding box before sending to the API to reduce token cost and improve accuracy.
-3. **AI Detection** — `KadalammaKalliDetector` calls the `/api/recognize-handwriting` route, which submits the canvas image to Gemini and returns a structured `DetectionResult` with `recognizedText`, `confidence`, and `matched` flag.
-4. **Wave Response** — On a successful match, `VigorousSeaController` advances the video through predefined wave milestones (`5.0s → 13.5s → 21.0s → 28.5s → 35.5s`), making the ocean "react" to the written phrase.
+![Shore and Wave Counting](./public/screenshots/shore_wave_counting.jpg)
+*Live shoreline view showing the 2D silhouette boy sitting on the sand counting ocean waves in real time.*
+
+![Sand Carving](./public/screenshots/sand_carving.jpg)
+*Interactive sand canvas with dynamic trench shading where users write with touch or mouse.*
+
+![Wave Surge Erasure](./public/screenshots/wave_surge_erasure.jpg)
+*Mother Sea ('Kadalamma') responding with a massive tidal surge that erases the carved text after AI recognition.*
+
+# Diagrams
+
+```mermaid
+graph TD
+    A["✍️ User Draws on Beach Sand"] --> B["🎨 HTML5 Canvas with Trench Shader Physics"]
+    B --> C["⏱️ Stroke Pause / Debounce Trigger"]
+    C --> D["📷 Canvas Preprocessor Crops & Encodes Base64 Image"]
+    D --> E["🧠 Google Gemini Multimodal Vision API (gemini-3.5-flash-lite)"]
+    E --> F{"Is Text 'Kadalamma Kalli'?"}
+    F -- "No / Other Text" --> G["👦 Boy Continues Counting Waves 🌊"]
+    F -- "Yes (Matched)" --> H["🌊 Vigorous Sea Controller Triggered"]
+    H --> I["🌊 Tidal Surge Wave Rushes In"]
+    I --> J["✨ Sand Washed Completely Clean!"]
+```
+*System Workflow: from user strokes on sand, to Gemini Multimodal Vision recognition, to the triggered ocean wave wipe.*
 
 ---
 
-## 📁 Project Structure
+### Project Demo
+# Video
+[Watch Project Demo Video on Google Drive](https://drive.google.com/file/d/1F2gGYB5HwFHcc8Tt0UANLe5lSH8WH2ma/view?usp=sharing)
 
-```
-src/
-├── app/
-│   ├── api/
-│   │   └── recognize-handwriting/   # Gemini API route
-│   ├── layout.tsx
-│   └── page.tsx                     # Entry point
-└── components/
-    ├── VanillaBeachExperience.tsx   # Main experience orchestrator
-    ├── BeachSeashoreExperience.tsx  # Alternative scene variant
-    ├── SeashoreScene.tsx            # Three.js 3D scene
-    ├── SandCanvasManager.ts         # Canvas drawing logic
-    ├── AudioEngine.ts               # Web Audio API wrapper
-    ├── vectorFont.ts                # Custom vector font rendering
-    └── recognition/
-        ├── KadalammaKalliDetector.ts    # AI detection pipeline
-        ├── VigorousSeaController.ts     # Wave animation controller
-        ├── HandwritingPreprocessor.ts   # Canvas image preprocessing
-        └── DebugPanel.tsx               # Developer debug overlay
-public/
-└── we_want_to_loop_the_video_so_m.mp4  # Ocean background video
-```
+*Demonstrates interactive sand writing, the 2D wave-counting boy on the shore, Gemini Vision detecting "Kadalamma Kalli", and the sudden tidal wave that rushes in to erase the writing.*
+
+# Additional Demos
+- GitHub Repository: [https://github.com/Saf369/kadalamma_kalli](https://github.com/Saf369/kadalamma_kalli)
 
 ---
 
-## 📜 Available Scripts
-
-| Command | Description |
-|---|---|
-| `npm run dev` | Start the development server |
-| `npm run build` | Build the production bundle |
-| `npm run start` | Run the production server |
-| `npm run lint` | Run ESLint |
+## Team Contributions
+- **Saf369**: Core architecture, Next.js application, Canvas sand rendering engine, Gemini Vision API integration, video wave synchronization, and wave counting companion.
+- **Member 2**: UI/UX design, aesthetic enhancements, and testing.
+- **Member 3**: Concept brainstorming, sound integration, and demo presentation.
 
 ---
+Made with ❤️ at TinkerHub Useless Projects 
 
-## 📄 License
-
-This project is private. All rights reserved.
-
----
-
-<p align="center">Made with 🌊 and AI by <strong>Kadalamma Kalli</strong></p>
+![Static Badge](https://img.shields.io/badge/TinkerHub-24?color=%23000000&link=https%3A%2F%2Fwww.tinkerhub.org%2F)
+![Static Badge](https://img.shields.io/badge/UselessProjects--26-26?link=https%3A%2F%2Ftinkerhub.org%2Fevents%2F1M8ORET9A1%2Fuseless-projects-3.0)
