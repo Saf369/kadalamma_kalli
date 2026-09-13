@@ -65,14 +65,14 @@ For Software:
 
 # Screenshots (Add at least 3)
 
-![Shore and Wave Counting](./public/screenshots/shore_wave_counting.jpg)
+![Shore and Wave Counting](./public/screenshots/1_shore_wave_counting.png)
 *Live shoreline view showing the 2D silhouette boy sitting on the sand counting ocean waves in real time.*
 
-![Sand Carving](./public/screenshots/sand_carving.jpg)
-*Interactive sand canvas with dynamic trench shading where users write with touch or mouse.*
+![Handwriting Recognition Analysis](./public/screenshots/2_drawing_recognition.png)
+*Real-time handwriting recognition on sand canvas with Gemini Vision confidence scoring and phrase verification.*
 
-![Wave Surge Erasure](./public/screenshots/wave_surge_erasure.jpg)
-*Mother Sea ('Kadalamma') responding with a massive tidal surge that erases the carved text after AI recognition.*
+![Kadalamma Kalli Matched](./public/screenshots/3_kadalamma_kalli_matched.png)
+*Target phrase "Kadalamma Kalli" recognized with 99% confidence, awakening the sea and triggering the tidal wave surge.*
 
 # Diagrams
 
