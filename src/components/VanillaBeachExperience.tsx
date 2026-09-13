@@ -8,7 +8,8 @@ import type { DetectionResult } from './recognition/KadalammaKalliDetector';
 const DebugPanel = React.lazy(() => import('./recognition/DebugPanel'));
 
 const TARGET_PHRASE = 'kadalamma kalli';
-const VIDEO_SRC = '/Firefly Cinematic ultra-wide landscape view of a scenic seashore. Extreme wide shot showing the vast.mp4';
+const VIDEO_SRC = '/we_want_to_loop_the_video_so_m.mp4';
+const WAVE_MILESTONES = [5.0, 13.5, 21.0, 28.5, 35.5];
 
 // Sand region boundary in percentage of video height (sand is below 45% from top)
 const SAND_TOP_RATIO = 0.45;
@@ -343,23 +344,35 @@ export default function VanillaBeachExperience() {
     }
 
     let lastVideoTime = 0;
+    const countedMilestones = new Set<number>();
+
     const onTimeUpdate = () => {
       if (!video) return;
 
       const curTime = video.currentTime;
-      // If the video loops back to the start, count it as a wave
-      if (curTime < lastVideoTime && lastVideoTime - curTime > 1.0) {
-        setWaveCount(c => c + 1);
+
+      // When the video loops back to the start
+      if (curTime < lastVideoTime && lastVideoTime - curTime > 2.0) {
+        countedMilestones.clear();
       }
+
+      // Increment wave count when crossing each wave milestone
+      for (const m of WAVE_MILESTONES) {
+        if (curTime >= m && !countedMilestones.has(m)) {
+          countedMilestones.add(m);
+          setWaveCount(c => c + 1);
+        }
+      }
+
       lastVideoTime = curTime;
 
       // ONLY erase the canvas if the VigorousSeaController has actively triggered the surge!
       if (vigorousControllerRef.current?.currentState !== 'vigorous') return;
 
-      if (curTime >= 0.8 && curTime <= 3.4) {
-        const surgeProgress = (curTime - 0.8) / 2.4;
+      if (curTime >= 2.4 && curTime <= 5.0) {
+        const surgeProgress = (curTime - 2.4) / 2.6;
         eraseCanvasWithWaveFront(surgeProgress);
-      } else if (curTime > 3.4 && curTime <= 4.0) {
+      } else if (curTime > 5.0 && curTime <= 5.8) {
         eraseCanvasWithWaveFront(1.0);
         strokeCountRef.current = 0;
         detector.resetCache();
@@ -379,7 +392,7 @@ export default function VanillaBeachExperience() {
     // ── Surge trigger (shared between manual and AI) ──────────────────────────
     function triggerSurge() {
       if (!video) return;
-      video.currentTime = 0.8;
+      video.currentTime = 2.4;
       video.play().catch(() => { });
     }
 
